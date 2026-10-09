@@ -43,7 +43,7 @@ STAGES = [  # (название, вес, функция -> доля 0..1)
     ("Задача 2: сервер, тесты, Inspector", 20, lambda: float((ROOT / "tests" / "pytest_log.txt").exists()
                                                             and (ROOT / "inspector" / "inspector_log.txt").exists())),
     ("Задача 3A: 720 запусков выбора", 30, lambda: min(lines(ROOT / "experiment/logs/part_a.jsonl") / 720, 1)),
-    ("Задача 3B: 60 эпизодов петель", 15, lambda: min(lines(ROOT / "experiment/logs/part_b.jsonl") / 60, 1)),
+    ("Задача 3B: 80 эпизодов петель", 15, lambda: min(lines(ROOT / "experiment/logs/part_b.jsonl") / 80, 1)),
     ("Анализ: ноутбук исполнен", 5, notebook_executed),
     ("Отчёт: report.pdf", 10, lambda: float((ROOT / "report" / "report.pdf").exists())),
     ("Репозиторий на GitHub", 10, repo_published),
@@ -55,7 +55,7 @@ def main() -> None:
     total = sum(w * v for _, w, v in parts) / sum(w for _, w, _ in parts) * 100
     bar = "█" * int(total // 5) + "░" * (20 - int(total // 5))
     a, b = lines(ROOT / "experiment/logs/part_a.jsonl"), lines(ROOT / "experiment/logs/part_b.jsonl")
-    print(f"[{bar}] {total:5.1f}% готово, осталось {100 - total:4.1f}%  (A {a}/720, B {b}/60)", flush=True)
+    print(f"[{bar}] {total:5.1f}% готово, осталось {100 - total:4.1f}%  (A {a}/720, B {b}/80)", flush=True)
     if "--detail" in sys.argv:
         for name, w, v in parts:
             print(f"  {v * 100:5.1f}%  вес {w:2d}  {name}")

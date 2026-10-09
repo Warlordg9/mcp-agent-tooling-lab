@@ -6,7 +6,8 @@ consult_search_slots в 50% вызовов (монета с seed по задач
 Три условия, 20 задач в каждом, один эпизод на задачу:
   no_guard — flaky_empty без LoopGuard;
   guard    — flaky_empty с LoopGuard (3 повтора в окне 6);
-  hint     — flaky_hint без LoopGuard.
+  hint     — flaky_hint без LoopGuard;
+  stable   — контроль: обычный (стабильный) поиск, без LoopGuard.
 
 LoopGuard (реализация по описанию из лекции): перед исполнением вызова берём
 окно из последних 6 попыток вызова (включая текущую); если такая же пара
@@ -42,7 +43,8 @@ from experiment.common import CHAT_MODEL, DATA, LOGS, NUM_CTX, TEMPERATURE, chat
 
 MAX_TURNS = 15
 GUARD_REPEATS, GUARD_WINDOW, GUARD_MAX_TRIGGERS = 3, 6, 2
-CONDITIONS = {"no_guard": ("flaky_empty", False), "guard": ("flaky_empty", True), "hint": ("flaky_hint", False)}
+CONDITIONS = {"no_guard": ("flaky_empty", False), "guard": ("flaky_empty", True), "hint": ("flaky_hint", False),
+              "stable": ("normal", False)}  # контроль: стабильный инструмент
 TOOLS = [{"name": n, "description": s["description"], "parameters": s["input_schema"]} for n, s in TOOL_SPECS.items()]
 SYSTEM = ("Ты — агент записи студентов на консультации курса. Действуй только через инструменты consult_*. "
           "Сегодня 2026-10-12. Студент уже дал согласие на любой подходящий слот, переспрашивать не нужно. "

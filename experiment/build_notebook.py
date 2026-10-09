@@ -62,20 +62,20 @@ pd.options.display.float_format = '{:.3f}'.format
 summary""")
 
 code("""fig, ax = plt.subplots(figsize=(6.4, 3.8))
-for v, color, label in [('A', '#1f77b4', 'A: все N описаний'), ('B', '#d62728', 'B: top-5 по эмбеддингам')]:
+for v, color, label, dx in [('A', '#1f77b4', 'A: все N описаний', 0.95), ('B', '#d62728', 'B: top-5 по эмбеддингам', 1.0)]:
     s = summary[summary.variant==v].sort_values('N')
-    ax.errorbar(s.N, s.accuracy, yerr=[s.accuracy-s.acc_lo, s.acc_hi-s.accuracy], marker='o', capsize=4, color=color, label=label)
+    ax.errorbar(s.N*dx, s.accuracy, yerr=[s.accuracy-s.acc_lo, s.acc_hi-s.accuracy], marker='o', capsize=4, color=color, label=label)
 s = summary[summary.variant=='B'].sort_values('N')
-ax.errorbar(s.N, s.recall5, yerr=[s.recall5-s.rec_lo, s.rec_hi-s.recall5], marker='s', ls='--', capsize=4, color='gray', label='Recall@5 поиска')
+ax.errorbar(s.N*1.05, s.recall5, yerr=[s.recall5-s.rec_lo, s.rec_hi-s.recall5], marker='s', ls='--', capsize=4, color='gray', label='Recall@5 поиска')
 ax.set_xscale('log'); ax.set_xticks([5,20,50,100]); ax.set_xticklabels([5,20,50,100])
-ax.set_xlabel('N — число инструментов в пуле'); ax.set_ylabel('доля'); ax.set_ylim(0, 1.05)
+ax.set_xlabel('N — число инструментов в пуле'); ax.set_ylabel('доля'); ax.set_ylim(0.5, 1.02)
 ax.set_title(f'Точность выбора ({CHAT_MODEL}), 30 запросов × 3 запуска, 95% CI'); ax.grid(alpha=.3); ax.legend(fontsize=8, loc='lower left')
 fig.tight_layout(); fig.savefig(RESULTS/'accuracy_vs_N.png', dpi=200); fig.savefig(RESULTS/'accuracy_vs_N.pdf')""")
 
 md("### Таблица токенов (среднее число входных токенов на запрос, `prompt_eval_count` из Ollama)")
 code("""tokens = summary.pivot(index='N', columns='variant', values='mean_input_tokens')
 tokens['B / A'] = tokens['B'] / tokens['A']
-tokens.to_csv(RESULTS/'part_a_tokens.csv'); tokens.round(0)""")
+tokens.to_csv(RESULTS/'part_a_tokens.csv'); tokens.round({'A': 0, 'B': 0, 'B / A': 2})""")
 
 md("### Разрез: запросы к своим инструментам и «почти похожие» запросы (gold — отвлекающий инструмент)")
 code("""A['gold_kind'] = A.gold.map(pool.set_index('name').kind)
@@ -89,12 +89,13 @@ pd.crosstab(wrong.gold, wrong.selected.fillna('<нет вызова>')).stack().
 md("## Часть B. Петли: три условия")
 code("""B = pd.DataFrame([json.loads(l) for l in open(ROOT/'experiment/logs/part_b.jsonl', encoding='utf-8')])
 tasks = json.load(open(ROOT/'experiment/data/loop_tasks.json', encoding='utf-8'))
-print('эпизодов:', len(B), '| ожидалось:', 3*len(tasks), '| статусы:', B.status.value_counts().to_dict())
+print('эпизодов:', len(B), '| ожидалось:', 4*len(tasks), '| статусы:', B.status.value_counts().to_dict())
 B['success'] = B['success'].fillna(False).astype(bool)
 def ci(x):
     m, lo, hi = bootstrap_ci(np.asarray(x, dtype=float)); return f'{m:.2f} [{lo:.2f}; {hi:.2f}]'
-order = ['no_guard', 'guard', 'hint']
-names = {'no_guard': 'пустой ответ, без LoopGuard', 'guard': 'пустой ответ + LoopGuard (3/6)', 'hint': 'ответ с подсказкой, без LoopGuard'}
+order = ['no_guard', 'guard', 'hint', 'stable']
+names = {'no_guard': 'пустой ответ, без LoopGuard', 'guard': 'пустой ответ + LoopGuard (3/6)',
+         'hint': 'ответ с подсказкой, без LoopGuard', 'stable': 'контроль: стабильный инструмент'}
 table = pd.DataFrame({c: {
     'эпизодов': len(g), 'доля с петлёй': ci(g.loop.fillna(True)), 'успех': ci(g.success),
     'шагов LLM (ср.)': g.turns.mean(), 'вызовов инструментов (ср.)': g.tool_calls.mean(),
@@ -102,6 +103,24 @@ table = pd.DataFrame({c: {
     'окончание': g.end.value_counts().to_dict()} for c, g in B.groupby('condition')}).T.loc[order]
 table.index = [names[i] for i in table.index]
 table.to_csv(RESULTS/'part_b_loops.csv'); table""")
+
+md("""### Режимы отказа
+
+Пустой ответ ломает агента не только петлями. Для каждого эпизода считаем: была ли попытка записать
+**несуществующий слот** (slot_id выдуман моделью: ошибка «не найден»), закончился ли эпизод **без записи**
+(отказ или преждевременный ответ), и сколько пустых или «ничего не найдено» ответов поиска получил агент.""")
+code("""def modes(r):
+    tr = r.trace if isinstance(r.trace, list) else []
+    calls = [s for s in tr if 'tool' in s]
+    booked = any(s['tool'] == 'consult_book' and not s['is_error'] for s in calls)
+    return pd.Series({
+        'выдуманный slot_id': any(s['tool'] == 'consult_book' and 'не найден' in (s['result'] or '') for s in calls),
+        'нет ни одной брони': not booked,
+        'пустых/«ничего не найдено» ответов поиска': sum(s['tool'] == 'consult_search_slots' and (s['result'] == '' or s['result'].startswith('Ничего не найдено')) for s in calls),
+    })
+fm = B.join(B.apply(modes, axis=1)).groupby('condition')[['выдуманный slot_id', 'нет ни одной брони', 'пустых/«ничего не найдено» ответов поиска']].mean().loc[order]
+fm.index = [names[i] for i in fm.index]
+fm.to_csv(RESULTS/'part_b_failure_modes.csv'); fm.round(2)""")
 
 code("""# Типичная петля из лога (первая найденная в условии no_guard)
 ep = B[(B.condition=='no_guard') & (B.loop==True)].head(1)

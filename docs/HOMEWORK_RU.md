@@ -94,7 +94,7 @@ bash inspector/run_inspector.sh      # npx @modelcontextprotocol/inspector@2.10.
 * **пул:** [`experiment/data/tool_pool.json`](../experiment/data/tool_pool.json) — 100 инструментов: 6 своих, 25 сгенерированных близких по смыслу (учебное расписание, календари, аудитории, поликлиника), 69 описаний из публичных MCP-серверов; сборка — [`experiment/pool.py`](../experiment/pool.py);
 * **запросы:** [`experiment/data/queries.json`](../experiment/data/queries.json) — 30 штук с разметкой: 24 к своим инструментам и 6 «почти похожих», где правильный ответ — отвлекающий инструмент;
 * **часть A:** [`experiment/part_a.py`](../experiment/part_a.py) → [`logs/part_a.jsonl`](../experiment/logs/part_a.jsonl) (720 запусков: 30 × 4 N × 2 варианта × 3);
-* **часть B:** [`experiment/part_b.py`](../experiment/part_b.py) → [`logs/part_b.jsonl`](../experiment/logs/part_b.jsonl) (20 задач × 3 условия, полный trace каждого эпизода); задачи — [`experiment/data/loop_tasks.json`](../experiment/data/loop_tasks.json).
+* **часть B:** [`experiment/part_b.py`](../experiment/part_b.py) → [`logs/part_b.jsonl`](../experiment/logs/part_b.jsonl) (20 задач × 3 требуемых условия + контроль со стабильным инструментом = 80 эпизодов, полный trace каждого); задачи — [`experiment/data/loop_tasks.json`](../experiment/data/loop_tasks.json).
 
 Повторить:
 

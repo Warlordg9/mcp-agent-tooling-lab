@@ -21,7 +21,7 @@ Everything runs locally on an open model (`qwen2.5:3b` and `bge-m3` via Ollama):
 - **Errors as data, not stack traces:** schema violations and domain errors come back as `isError: true` with a "how to fix" hint. The experiment shows the model fixing its own call from that hint.
 - **Explicit state handles instead of sessions:** `booking_id`, `student_id`, and opaque pagination `cursor`s. Any request can be served by a fresh server instance.
 - **Tested:** 19 pytest tests (protocol, schemas, success and error paths for every tool), an MCP Inspector CLI run, and CI on GitHub Actions.
-- **Evaluation harness:** a 100-tool pool (6 own, 25 near-domain distractors, 69 public-MCP-style tools), 30 labelled queries, 720 selection runs, 60 agent episodes, and 95% bootstrap CIs that resample *queries*, not runs.
+- **Evaluation harness:** a 100-tool pool (6 own, 25 near-domain distractors, 69 public-MCP-style tools), 30 labelled queries, 720 selection runs, 80 agent episodes, and 95% bootstrap CIs that resample *queries*, not runs.
 
 ## Repository layout
 
@@ -72,6 +72,34 @@ curl -s localhost:8765/mcp \
 | `consult_get_booking` | verify a booking's status |
 | `consult_list_bookings` | a student's bookings |
 | `consult_cancel` | cancel the student's own booking |
+
+## Results (qwen2.5:3b, 95% bootstrap CI over queries)
+
+**Tool selection from N tools** — accuracy, % (A: all N descriptions in context; B: top-5 embedding retrieval):
+
+| N | A (all in context) | B (top-5 retrieval) | Recall@5 | input tokens A / B |
+|---:|---|---|---|---:|
+| 5 | 97 [90; 100] | 99 [97; 100] | 100 | 750 / 750 |
+| 20 | 97 [90; 100] | 97 [90; 100] | 97 | 1 757 / 882 |
+| 50 | 94 [86; 100] | 87 [73; 97] | 93 | 3 993 / 1 057 |
+| 100 | 84 [72; 96] | 76 [60; 90] | 83 | 7 734 / 1 041 |
+
+![accuracy vs N](experiment/results/accuracy_vs_N.png)
+
+- Retrieval cuts input tokens by up to **7.4×**, but its accuracy is capped by Recall@5: when the right tool is retrieved, the model picks it in 91–93% of cases. With 100 tools, full context is still ~8 pp more accurate (the CIs overlap).
+- Near-miss queries (where the right answer is a distractor) were solved almost perfectly, so the "do not use for…" clauses work. Most errors are confusions between *sibling* tools (`list_bookings` → `cancel`).
+
+**Silent failures and loops** (20 tasks per condition; `consult_search_slots` returns an empty result in 50% of calls):
+
+| Condition | loop | success | tokens | hallucinated slot_id | no booking |
+|---|---|---|---:|---:|---:|
+| empty result, no guard | 5% | 70% | 14.6k | 15% | 15% |
+| empty result + LoopGuard (3 in window 6) | 5% | 65% | 14.2k | 15% | 20% |
+| "nothing found; try another date" | 0% | 60% | 14.3k | 10% | 25% |
+| control: stable tool | 0% | 75% | 11.7k | 0% | 5% |
+
+- A small model rarely loops strictly. Silent failures make it **hallucinate IDs or give up** instead. Flakiness costs 5–15 pp of success and about 25% more tokens.
+- The "fixed" message is *false* (slots do exist), and it made the agent give up more often. Lesson: a tool fix must be truthful ("temporary error, retry"); a harness guard is insurance against a rare but expensive loop (37k vs 14k tokens), not a substitute for that.
 
 ## Running the experiment
 
