@@ -1,0 +1,2222 @@
+[
+ {
+  "name": "consult_search_slots",
+  "kind": "own",
+  "description": "Ищет слоты консультаций преподавателей курса на один день с фильтрами по формату, теме и преподавателю. Используй, когда студент хочет найти свободное время консультации или выбрать слот перед записью. Не используй для записи (consult_book), для просмотра своих броней (consult_list_bookings) и для вопросов о расписании лекций, дедлайнах и оценках — этих данных здесь нет. Если на день ничего нет, ответ подскажет ближайшие дни со слотами.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "date": {
+     "type": "string",
+     "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+     "description": "День консультации в формате YYYY-MM-DD, например 2026-10-14. Расписание есть на 2026-10-12 — 2026-10-23."
+    },
+    "format": {
+     "type": "string",
+     "enum": [
+      "online",
+      "offline"
+     ],
+     "description": "Формат встречи: online (видеосвязь) или offline (аудитория). Не указывай, если формат не важен."
+    },
+    "topic": {
+     "type": "string",
+     "enum": [
+      "homework",
+      "project",
+      "exam",
+      "lecture"
+     ],
+     "description": "Тема: homework — домашние задания, project — курсовой проект, exam — подготовка к экзамену, lecture — вопросы по лекциям."
+    },
+    "teacher": {
+     "type": "string",
+     "enum": [
+      "ivanova",
+      "petrov",
+      "sidorova",
+      "kuznetsov",
+      "smirnova"
+     ],
+     "description": "Преподаватель по фамилии латиницей: ivanova, petrov, sidorova, kuznetsov, smirnova."
+    },
+    "only_free": {
+     "type": "boolean",
+     "default": true,
+     "description": "true — только слоты со свободными местами (по умолчанию); false — все слоты дня."
+    },
+    "limit": {
+     "type": "integer",
+     "minimum": 1,
+     "maximum": 20,
+     "default": 5,
+     "description": "Сколько слотов вернуть за раз, 1–20 (по умолчанию 5)."
+    },
+    "cursor": {
+     "type": "string",
+     "minLength": 1,
+     "description": "Handle следующей страницы (next_cursor из прошлого ответа с теми же фильтрами). Для первой страницы не передавай."
+    },
+    "response_format": {
+     "type": "string",
+     "enum": [
+      "concise",
+      "detailed"
+     ],
+     "default": "concise",
+     "description": "concise — короткие строки с идентификаторами (по умолчанию, экономит токены); detailed — JSON со всеми полями: аудитория или ссылка, темы, вместимость, правила."
+    }
+   },
+   "required": [
+    "date"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "consult_get_slot",
+  "kind": "own",
+  "description": "Возвращает карточку одного слота по slot_id: время, длительность, формат, аудиторию или ссылку, темы и свободные места. Используй, чтобы уточнить детали уже найденного слота перед записью. Не используй для поиска по дате или преподавателю (consult_search_slots) и для статуса брони (consult_get_booking).",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "slot_id": {
+     "type": "string",
+     "pattern": "^s-\\d{4}-[a-z]{3}-\\d{4}$",
+     "description": "Идентификатор слота из результата consult_search_slots, например s-1014-iva-1000."
+    },
+    "response_format": {
+     "type": "string",
+     "enum": [
+      "concise",
+      "detailed"
+     ],
+     "default": "concise",
+     "description": "concise — короткие строки с идентификаторами (по умолчанию, экономит токены); detailed — JSON со всеми полями: аудитория или ссылка, темы, вместимость, правила."
+    }
+   },
+   "required": [
+    "slot_id"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "consult_book",
+  "kind": "own",
+  "description": "Записывает студента на выбранный слот и возвращает booking_id и статус active. Используй только после того, как студент явно выбрал слот и подтвердил запись. Не используй для поиска времени (consult_search_slots), переноса без отмены старой брони и записи другого студента. Повтор с тем же idempotency_key не создаёт дубль.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "slot_id": {
+     "type": "string",
+     "pattern": "^s-\\d{4}-[a-z]{3}-\\d{4}$",
+     "description": "Идентификатор слота из результата consult_search_slots, например s-1014-iva-1000."
+    },
+    "student_id": {
+     "type": "string",
+     "pattern": "^st-\\d{4}$",
+     "description": "Идентификатор студента, от чьего имени действует агент, например st-1001."
+    },
+    "topic": {
+     "type": "string",
+     "enum": [
+      "homework",
+      "project",
+      "exam",
+      "lecture"
+     ],
+     "description": "Тема консультации; должна входить в темы слота: homework, project, exam или lecture."
+    },
+    "idempotency_key": {
+     "type": "string",
+     "minLength": 8,
+     "maxLength": 64,
+     "description": "Уникальная строка на одну попытку записи (8–64 символа). При повторе той же записи передай тот же ключ."
+    },
+    "response_format": {
+     "type": "string",
+     "enum": [
+      "concise",
+      "detailed"
+     ],
+     "default": "concise",
+     "description": "concise — короткие строки с идентификаторами (по умолчанию, экономит токены); detailed — JSON со всеми полями: аудитория или ссылка, темы, вместимость, правила."
+    }
+   },
+   "required": [
+    "slot_id",
+    "student_id",
+    "topic",
+    "idempotency_key"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "consult_get_booking",
+  "kind": "own",
+  "description": "Возвращает бронь студента по booking_id: слот, тему и статус (active или cancelled). Используй, чтобы проверить результат consult_book или consult_cancel. Не используй для поиска свободных слотов и для списка всех броней (consult_list_bookings).",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "booking_id": {
+     "type": "string",
+     "pattern": "^b-[0-9a-f]{8}$",
+     "description": "Handle брони, который вернул consult_book или consult_list_bookings, например b-1a2b3c4d."
+    },
+    "student_id": {
+     "type": "string",
+     "pattern": "^st-\\d{4}$",
+     "description": "Идентификатор студента, от чьего имени действует агент, например st-1001."
+    },
+    "response_format": {
+     "type": "string",
+     "enum": [
+      "concise",
+      "detailed"
+     ],
+     "default": "concise",
+     "description": "concise — короткие строки с идентификаторами (по умолчанию, экономит токены); detailed — JSON со всеми полями: аудитория или ссылка, темы, вместимость, правила."
+    }
+   },
+   "required": [
+    "booking_id",
+    "student_id"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "consult_list_bookings",
+  "kind": "own",
+  "description": "Показывает брони консультаций одного студента с фильтром по статусу. Используй, когда студент спрашивает, на какие консультации он записан, или нужно найти booking_id для отмены. Не используй для поиска свободного времени (consult_search_slots) и для броней других студентов.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "student_id": {
+     "type": "string",
+     "pattern": "^st-\\d{4}$",
+     "description": "Идентификатор студента, от чьего имени действует агент, например st-1001."
+    },
+    "status": {
+     "type": "string",
+     "enum": [
+      "active",
+      "cancelled",
+      "all"
+     ],
+     "default": "active",
+     "description": "active — действующие брони (по умолчанию), cancelled — отменённые, all — все."
+    },
+    "response_format": {
+     "type": "string",
+     "enum": [
+      "concise",
+      "detailed"
+     ],
+     "default": "concise",
+     "description": "concise — короткие строки с идентификаторами (по умолчанию, экономит токены); detailed — JSON со всеми полями: аудитория или ссылка, темы, вместимость, правила."
+    }
+   },
+   "required": [
+    "student_id"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "consult_cancel",
+  "kind": "own",
+  "description": "Отменяет бронь студента по booking_id и освобождает место. Используй только по явной просьбе студента отменить свою запись. Не используй для чужих броней, для проверки статуса (consult_get_booking) и как первый шаг переноса без согласия студента.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "booking_id": {
+     "type": "string",
+     "pattern": "^b-[0-9a-f]{8}$",
+     "description": "Handle брони, который вернул consult_book или consult_list_bookings, например b-1a2b3c4d."
+    },
+    "student_id": {
+     "type": "string",
+     "pattern": "^st-\\d{4}$",
+     "description": "Идентификатор студента, от чьего имени действует агент, например st-1001."
+    },
+    "response_format": {
+     "type": "string",
+     "enum": [
+      "concise",
+      "detailed"
+     ],
+     "default": "concise",
+     "description": "concise — короткие строки с идентификаторами (по умолчанию, экономит токены); detailed — JSON со всеми полями: аудитория или ссылка, темы, вместимость, правила."
+    }
+   },
+   "required": [
+    "booking_id",
+    "student_id"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "course_get_lecture_schedule",
+  "kind": "near",
+  "description": "Возвращает расписание лекций и семинаров курса на неделю: время, аудитория, лектор.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "week": {
+     "type": "integer",
+     "description": "Номер учебной недели"
+    }
+   },
+   "required": [
+    "week"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "course_get_deadlines",
+  "kind": "near",
+  "description": "Показывает дедлайны домашних заданий и проекта курса.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "student_id": {
+     "type": "string",
+     "description": "Идентификатор студента"
+    }
+   },
+   "required": [],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "course_get_grades",
+  "kind": "near",
+  "description": "Возвращает оценки и баллы студента по заданиям курса.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "student_id": {
+     "type": "string",
+     "description": "Идентификатор студента"
+    }
+   },
+   "required": [
+    "student_id"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "course_submit_homework",
+  "kind": "near",
+  "description": "Загружает решение домашнего задания студента на проверку.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "student_id": {
+     "type": "string",
+     "description": "Студент"
+    },
+    "assignment_id": {
+     "type": "string",
+     "description": "Номер задания"
+    },
+    "file_url": {
+     "type": "string",
+     "description": "Ссылка на файл"
+    }
+   },
+   "required": [
+    "student_id",
+    "assignment_id",
+    "file_url"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "course_list_materials",
+  "kind": "near",
+  "description": "Список материалов курса: слайды лекций, конспекты, записи занятий.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "lecture": {
+     "type": "integer",
+     "description": "Номер лекции"
+    }
+   },
+   "required": [],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "course_message_teacher",
+  "kind": "near",
+  "description": "Отправляет преподавателю курса письменный вопрос в учебный чат; ответ приходит асинхронно.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "teacher": {
+     "type": "string",
+     "description": "Преподаватель"
+    },
+    "text": {
+     "type": "string",
+     "description": "Текст вопроса"
+    }
+   },
+   "required": [
+    "teacher",
+    "text"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "course_get_teacher_contacts",
+  "kind": "near",
+  "description": "Возвращает контакты преподавателей курса: почту, кафедру, кабинет.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "teacher": {
+     "type": "string",
+     "description": "Фамилия преподавателя"
+    }
+   },
+   "required": [],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "course_regrade_request",
+  "kind": "near",
+  "description": "Создаёт апелляцию на пересмотр оценки за задание.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "student_id": {
+     "type": "string",
+     "description": "Студент"
+    },
+    "assignment_id": {
+     "type": "string",
+     "description": "Задание"
+    },
+    "reason": {
+     "type": "string",
+     "description": "Причина"
+    }
+   },
+   "required": [
+    "student_id",
+    "assignment_id",
+    "reason"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "exam_get_schedule",
+  "kind": "near",
+  "description": "Расписание экзаменов сессии: дата, аудитория, экзаменатор.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "course": {
+     "type": "string",
+     "description": "Курс"
+    }
+   },
+   "required": [],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "exam_register",
+  "kind": "near",
+  "description": "Регистрирует студента на экзамен или пересдачу в выбранную дату.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "student_id": {
+     "type": "string",
+     "description": "Студент"
+    },
+    "exam_id": {
+     "type": "string",
+     "description": "Экзамен"
+    },
+    "date": {
+     "type": "string",
+     "description": "Дата"
+    }
+   },
+   "required": [
+    "student_id",
+    "exam_id",
+    "date"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "room_search_free",
+  "kind": "near",
+  "description": "Ищет свободные учебные аудитории на дату и время для самостоятельных занятий.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "date": {
+     "type": "string",
+     "description": "Дата YYYY-MM-DD"
+    },
+    "capacity": {
+     "type": "integer",
+     "description": "Вместимость"
+    }
+   },
+   "required": [
+    "date"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "room_book",
+  "kind": "near",
+  "description": "Бронирует учебную аудиторию на интервал времени для группы студентов.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "room_id": {
+     "type": "string",
+     "description": "Аудитория"
+    },
+    "date": {
+     "type": "string",
+     "description": "Дата"
+    },
+    "start": {
+     "type": "string",
+     "description": "Начало"
+    },
+    "end": {
+     "type": "string",
+     "description": "Конец"
+    }
+   },
+   "required": [
+    "room_id",
+    "date",
+    "start",
+    "end"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "room_cancel_booking",
+  "kind": "near",
+  "description": "Отменяет бронь учебной аудитории.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "reservation_id": {
+     "type": "string",
+     "description": "Номер брони аудитории"
+    }
+   },
+   "required": [
+    "reservation_id"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "calendar_list_events",
+  "kind": "near",
+  "description": "Показывает события личного календаря пользователя за период.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "from": {
+     "type": "string",
+     "description": "Начало периода"
+    },
+    "to": {
+     "type": "string",
+     "description": "Конец периода"
+    }
+   },
+   "required": [
+    "from",
+    "to"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "calendar_create_event",
+  "kind": "near",
+  "description": "Создаёт событие в личном календаре пользователя с напоминанием.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "title": {
+     "type": "string",
+     "description": "Название"
+    },
+    "start": {
+     "type": "string",
+     "description": "Начало ISO"
+    },
+    "end": {
+     "type": "string",
+     "description": "Конец ISO"
+    }
+   },
+   "required": [
+    "title",
+    "start",
+    "end"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "calendar_find_free_time",
+  "kind": "near",
+  "description": "Находит общее свободное время нескольких участников в их календарях.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "emails": {
+     "type": "string",
+     "description": "Адреса участников через запятую"
+    },
+    "date": {
+     "type": "string",
+     "description": "Дата"
+    }
+   },
+   "required": [
+    "emails",
+    "date"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "calendar_delete_event",
+  "kind": "near",
+  "description": "Удаляет событие из личного календаря.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "event_id": {
+     "type": "string",
+     "description": "Идентификатор события"
+    }
+   },
+   "required": [
+    "event_id"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "clinic_find_appointments",
+  "kind": "near",
+  "description": "Ищет свободное время приёма врача в студенческой поликлинике.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "specialty": {
+     "type": "string",
+     "description": "Специальность врача"
+    },
+    "date": {
+     "type": "string",
+     "description": "Дата"
+    }
+   },
+   "required": [
+    "specialty"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "clinic_book_appointment",
+  "kind": "near",
+  "description": "Записывает пациента на приём к врачу поликлиники.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "slot_id": {
+     "type": "string",
+     "description": "Слот приёма"
+    },
+    "patient_id": {
+     "type": "string",
+     "description": "Пациент"
+    }
+   },
+   "required": [
+    "slot_id",
+    "patient_id"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "clinic_cancel_appointment",
+  "kind": "near",
+  "description": "Отменяет запись к врачу поликлиники.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "appointment_id": {
+     "type": "string",
+     "description": "Номер записи"
+    }
+   },
+   "required": [
+    "appointment_id"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "tutor_marketplace_search",
+  "kind": "near",
+  "description": "Ищет платных репетиторов на внешней площадке по предмету и цене.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "subject": {
+     "type": "string",
+     "description": "Предмет"
+    },
+    "max_price": {
+     "type": "integer",
+     "description": "Цена за час"
+    }
+   },
+   "required": [
+    "subject"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "library_reserve_book",
+  "kind": "near",
+  "description": "Бронирует книгу в университетской библиотеке.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "isbn": {
+     "type": "string",
+     "description": "ISBN"
+    },
+    "student_id": {
+     "type": "string",
+     "description": "Читатель"
+    }
+   },
+   "required": [
+    "isbn",
+    "student_id"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "meeting_create_video_link",
+  "kind": "near",
+  "description": "Создаёт ссылку на видеовстречу (Zoom/Meet) на заданное время.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "topic": {
+     "type": "string",
+     "description": "Тема"
+    },
+    "start": {
+     "type": "string",
+     "description": "Начало"
+    }
+   },
+   "required": [
+    "topic",
+    "start"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "reminder_create",
+  "kind": "near",
+  "description": "Создаёт напоминание пользователю на указанное время.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "text": {
+     "type": "string",
+     "description": "Текст"
+    },
+    "at": {
+     "type": "string",
+     "description": "Время ISO"
+    }
+   },
+   "required": [
+    "text",
+    "at"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "student_get_profile",
+  "kind": "near",
+  "description": "Возвращает профиль студента: группа, курс, контакты, статус обучения.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "student_id": {
+     "type": "string",
+     "description": "Студент"
+    }
+   },
+   "required": [
+    "student_id"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "read_file",
+  "kind": "public",
+  "description": "Read the complete contents of a file from the file system.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "path": {
+     "type": "string",
+     "description": "File path"
+    }
+   },
+   "required": [
+    "path"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "read_multiple_files",
+  "kind": "public",
+  "description": "Read the contents of multiple files simultaneously.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "paths": {
+     "type": "string",
+     "description": "Comma-separated paths"
+    }
+   },
+   "required": [
+    "paths"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "write_file",
+  "kind": "public",
+  "description": "Create a new file or completely overwrite an existing file with new content.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "path": {
+     "type": "string",
+     "description": "File path"
+    },
+    "content": {
+     "type": "string",
+     "description": "Content"
+    }
+   },
+   "required": [
+    "path",
+    "content"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "edit_file",
+  "kind": "public",
+  "description": "Make line-based edits to a text file and return a git-style diff.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "path": {
+     "type": "string",
+     "description": "File path"
+    },
+    "edits": {
+     "type": "string",
+     "description": "Edits as JSON"
+    }
+   },
+   "required": [
+    "path",
+    "edits"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "create_directory",
+  "kind": "public",
+  "description": "Create a new directory or ensure it exists.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "path": {
+     "type": "string",
+     "description": "Directory path"
+    }
+   },
+   "required": [
+    "path"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "list_directory",
+  "kind": "public",
+  "description": "Get a detailed listing of all files and directories in a path.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "path": {
+     "type": "string",
+     "description": "Directory path"
+    }
+   },
+   "required": [
+    "path"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "directory_tree",
+  "kind": "public",
+  "description": "Get a recursive tree view of files and directories as JSON.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "path": {
+     "type": "string",
+     "description": "Root path"
+    }
+   },
+   "required": [
+    "path"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "move_file",
+  "kind": "public",
+  "description": "Move or rename files and directories.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "source": {
+     "type": "string",
+     "description": "Source"
+    },
+    "destination": {
+     "type": "string",
+     "description": "Destination"
+    }
+   },
+   "required": [
+    "source",
+    "destination"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "search_files",
+  "kind": "public",
+  "description": "Recursively search for files and directories matching a pattern.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "path": {
+     "type": "string",
+     "description": "Root"
+    },
+    "pattern": {
+     "type": "string",
+     "description": "Glob pattern"
+    }
+   },
+   "required": [
+    "path",
+    "pattern"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "get_file_info",
+  "kind": "public",
+  "description": "Retrieve metadata about a file or directory: size, times, permissions.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "path": {
+     "type": "string",
+     "description": "Path"
+    }
+   },
+   "required": [
+    "path"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "git_status",
+  "kind": "public",
+  "description": "Shows the working tree status of a git repository.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "repo_path": {
+     "type": "string",
+     "description": "Repository path"
+    }
+   },
+   "required": [
+    "repo_path"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "git_diff_unstaged",
+  "kind": "public",
+  "description": "Shows changes in the working directory that are not yet staged.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "repo_path": {
+     "type": "string",
+     "description": "Repository path"
+    }
+   },
+   "required": [
+    "repo_path"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "git_commit",
+  "kind": "public",
+  "description": "Records changes to the repository with a commit message.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "repo_path": {
+     "type": "string",
+     "description": "Repository path"
+    },
+    "message": {
+     "type": "string",
+     "description": "Message"
+    }
+   },
+   "required": [
+    "repo_path",
+    "message"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "git_log",
+  "kind": "public",
+  "description": "Shows the commit logs of a repository.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "repo_path": {
+     "type": "string",
+     "description": "Repository path"
+    },
+    "max_count": {
+     "type": "integer",
+     "description": "Limit"
+    }
+   },
+   "required": [
+    "repo_path"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "git_create_branch",
+  "kind": "public",
+  "description": "Creates a new branch from an optional base branch.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "repo_path": {
+     "type": "string",
+     "description": "Repository path"
+    },
+    "branch_name": {
+     "type": "string",
+     "description": "Branch"
+    }
+   },
+   "required": [
+    "repo_path",
+    "branch_name"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "create_issue",
+  "kind": "public",
+  "description": "Create a new issue in a GitHub repository.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "owner": {
+     "type": "string",
+     "description": "Owner"
+    },
+    "repo": {
+     "type": "string",
+     "description": "Repo"
+    },
+    "title": {
+     "type": "string",
+     "description": "Title"
+    }
+   },
+   "required": [
+    "owner",
+    "repo",
+    "title"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "list_issues",
+  "kind": "public",
+  "description": "List and filter issues in a GitHub repository.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "owner": {
+     "type": "string",
+     "description": "Owner"
+    },
+    "repo": {
+     "type": "string",
+     "description": "Repo"
+    },
+    "state": {
+     "type": "string",
+     "description": "open/closed"
+    }
+   },
+   "required": [
+    "owner",
+    "repo"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "create_pull_request",
+  "kind": "public",
+  "description": "Create a new pull request in a GitHub repository.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "owner": {
+     "type": "string",
+     "description": "Owner"
+    },
+    "repo": {
+     "type": "string",
+     "description": "Repo"
+    },
+    "head": {
+     "type": "string",
+     "description": "Head"
+    },
+    "base": {
+     "type": "string",
+     "description": "Base"
+    }
+   },
+   "required": [
+    "owner",
+    "repo",
+    "head",
+    "base"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "search_repositories",
+  "kind": "public",
+  "description": "Search for GitHub repositories.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "query": {
+     "type": "string",
+     "description": "Query"
+    }
+   },
+   "required": [
+    "query"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "get_file_contents",
+  "kind": "public",
+  "description": "Get the contents of a file or directory from a GitHub repository.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "owner": {
+     "type": "string",
+     "description": "Owner"
+    },
+    "repo": {
+     "type": "string",
+     "description": "Repo"
+    },
+    "path": {
+     "type": "string",
+     "description": "Path"
+    }
+   },
+   "required": [
+    "owner",
+    "repo",
+    "path"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "add_issue_comment",
+  "kind": "public",
+  "description": "Add a comment to an existing GitHub issue.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "owner": {
+     "type": "string",
+     "description": "Owner"
+    },
+    "repo": {
+     "type": "string",
+     "description": "Repo"
+    },
+    "issue_number": {
+     "type": "integer",
+     "description": "Issue"
+    },
+    "body": {
+     "type": "string",
+     "description": "Comment"
+    }
+   },
+   "required": [
+    "owner",
+    "repo",
+    "issue_number",
+    "body"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "list_commits",
+  "kind": "public",
+  "description": "Get list of commits of a branch in a GitHub repository.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "owner": {
+     "type": "string",
+     "description": "Owner"
+    },
+    "repo": {
+     "type": "string",
+     "description": "Repo"
+    }
+   },
+   "required": [
+    "owner",
+    "repo"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "fork_repository",
+  "kind": "public",
+  "description": "Fork a GitHub repository to your account or organization.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "owner": {
+     "type": "string",
+     "description": "Owner"
+    },
+    "repo": {
+     "type": "string",
+     "description": "Repo"
+    }
+   },
+   "required": [
+    "owner",
+    "repo"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "slack_list_channels",
+  "kind": "public",
+  "description": "List public channels in the Slack workspace.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "limit": {
+     "type": "integer",
+     "description": "Limit"
+    }
+   },
+   "required": [],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "slack_post_message",
+  "kind": "public",
+  "description": "Post a new message to a Slack channel.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "channel_id": {
+     "type": "string",
+     "description": "Channel"
+    },
+    "text": {
+     "type": "string",
+     "description": "Text"
+    }
+   },
+   "required": [
+    "channel_id",
+    "text"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "slack_reply_to_thread",
+  "kind": "public",
+  "description": "Reply to a specific message thread in Slack.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "channel_id": {
+     "type": "string",
+     "description": "Channel"
+    },
+    "thread_ts": {
+     "type": "string",
+     "description": "Thread"
+    },
+    "text": {
+     "type": "string",
+     "description": "Text"
+    }
+   },
+   "required": [
+    "channel_id",
+    "thread_ts",
+    "text"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "slack_add_reaction",
+  "kind": "public",
+  "description": "Add a reaction emoji to a Slack message.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "channel_id": {
+     "type": "string",
+     "description": "Channel"
+    },
+    "timestamp": {
+     "type": "string",
+     "description": "Message"
+    },
+    "reaction": {
+     "type": "string",
+     "description": "Emoji"
+    }
+   },
+   "required": [
+    "channel_id",
+    "timestamp",
+    "reaction"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "slack_get_channel_history",
+  "kind": "public",
+  "description": "Get recent messages from a Slack channel.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "channel_id": {
+     "type": "string",
+     "description": "Channel"
+    }
+   },
+   "required": [
+    "channel_id"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "slack_get_users",
+  "kind": "public",
+  "description": "Get a list of all users in the Slack workspace with profile information.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "limit": {
+     "type": "integer",
+     "description": "Limit"
+    }
+   },
+   "required": [],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "read_query",
+  "kind": "public",
+  "description": "Execute a SELECT query on the SQLite database.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "query": {
+     "type": "string",
+     "description": "SQL"
+    }
+   },
+   "required": [
+    "query"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "write_query",
+  "kind": "public",
+  "description": "Execute an INSERT, UPDATE, or DELETE query on the SQLite database.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "query": {
+     "type": "string",
+     "description": "SQL"
+    }
+   },
+   "required": [
+    "query"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "create_table",
+  "kind": "public",
+  "description": "Create a new table in the SQLite database.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "query": {
+     "type": "string",
+     "description": "CREATE TABLE statement"
+    }
+   },
+   "required": [
+    "query"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "list_tables",
+  "kind": "public",
+  "description": "List all tables in the SQLite database.",
+  "parameters": {
+   "type": "object",
+   "properties": {},
+   "required": [],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "describe_table",
+  "kind": "public",
+  "description": "Get the schema information for a specific table.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "table_name": {
+     "type": "string",
+     "description": "Table"
+    }
+   },
+   "required": [
+    "table_name"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "query",
+  "kind": "public",
+  "description": "Run a read-only SQL query against a PostgreSQL database.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "sql": {
+     "type": "string",
+     "description": "SQL"
+    }
+   },
+   "required": [
+    "sql"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "create_entities",
+  "kind": "public",
+  "description": "Create multiple new entities in the knowledge graph.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "entities": {
+     "type": "string",
+     "description": "Entities JSON"
+    }
+   },
+   "required": [
+    "entities"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "create_relations",
+  "kind": "public",
+  "description": "Create multiple new relations between entities in the knowledge graph.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "relations": {
+     "type": "string",
+     "description": "Relations JSON"
+    }
+   },
+   "required": [
+    "relations"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "add_observations",
+  "kind": "public",
+  "description": "Add new observations to existing entities in the knowledge graph.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "observations": {
+     "type": "string",
+     "description": "Observations JSON"
+    }
+   },
+   "required": [
+    "observations"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "search_nodes",
+  "kind": "public",
+  "description": "Search for nodes in the knowledge graph based on a query.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "query": {
+     "type": "string",
+     "description": "Query"
+    }
+   },
+   "required": [
+    "query"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "read_graph",
+  "kind": "public",
+  "description": "Read the entire knowledge graph.",
+  "parameters": {
+   "type": "object",
+   "properties": {},
+   "required": [],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "delete_entities",
+  "kind": "public",
+  "description": "Delete multiple entities and their relations from the knowledge graph.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "entityNames": {
+     "type": "string",
+     "description": "Names"
+    }
+   },
+   "required": [
+    "entityNames"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "fetch",
+  "kind": "public",
+  "description": "Fetch a URL from the internet and extract its contents as markdown.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "url": {
+     "type": "string",
+     "description": "URL"
+    }
+   },
+   "required": [
+    "url"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "brave_web_search",
+  "kind": "public",
+  "description": "Perform a web search using the Brave Search API.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "query": {
+     "type": "string",
+     "description": "Query"
+    }
+   },
+   "required": [
+    "query"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "brave_local_search",
+  "kind": "public",
+  "description": "Search for local businesses and places using Brave's Local Search API.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "query": {
+     "type": "string",
+     "description": "Query"
+    }
+   },
+   "required": [
+    "query"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "puppeteer_navigate",
+  "kind": "public",
+  "description": "Navigate the browser to a URL.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "url": {
+     "type": "string",
+     "description": "URL"
+    }
+   },
+   "required": [
+    "url"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "puppeteer_screenshot",
+  "kind": "public",
+  "description": "Take a screenshot of the current page or a specific element.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "name": {
+     "type": "string",
+     "description": "Name"
+    }
+   },
+   "required": [
+    "name"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "puppeteer_click",
+  "kind": "public",
+  "description": "Click an element on the page.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "selector": {
+     "type": "string",
+     "description": "CSS selector"
+    }
+   },
+   "required": [
+    "selector"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "puppeteer_fill",
+  "kind": "public",
+  "description": "Fill out an input field on the page.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "selector": {
+     "type": "string",
+     "description": "CSS selector"
+    },
+    "value": {
+     "type": "string",
+     "description": "Value"
+    }
+   },
+   "required": [
+    "selector",
+    "value"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "puppeteer_evaluate",
+  "kind": "public",
+  "description": "Execute JavaScript in the browser console.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "script": {
+     "type": "string",
+     "description": "JavaScript"
+    }
+   },
+   "required": [
+    "script"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "maps_geocode",
+  "kind": "public",
+  "description": "Convert an address into geographic coordinates.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "address": {
+     "type": "string",
+     "description": "Address"
+    }
+   },
+   "required": [
+    "address"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "maps_directions",
+  "kind": "public",
+  "description": "Get directions between two points.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "origin": {
+     "type": "string",
+     "description": "Origin"
+    },
+    "destination": {
+     "type": "string",
+     "description": "Destination"
+    }
+   },
+   "required": [
+    "origin",
+    "destination"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "maps_search_places",
+  "kind": "public",
+  "description": "Search for places using Google Places API.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "query": {
+     "type": "string",
+     "description": "Query"
+    }
+   },
+   "required": [
+    "query"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "maps_distance_matrix",
+  "kind": "public",
+  "description": "Calculate travel distance and time for multiple origins and destinations.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "origins": {
+     "type": "string",
+     "description": "Origins"
+    },
+    "destinations": {
+     "type": "string",
+     "description": "Destinations"
+    }
+   },
+   "required": [
+    "origins",
+    "destinations"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "get_current_time",
+  "kind": "public",
+  "description": "Get current time in a specific timezone.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "timezone": {
+     "type": "string",
+     "description": "IANA timezone"
+    }
+   },
+   "required": [
+    "timezone"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "convert_time",
+  "kind": "public",
+  "description": "Convert time between timezones.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "time": {
+     "type": "string",
+     "description": "HH:MM"
+    },
+    "source_timezone": {
+     "type": "string",
+     "description": "From"
+    },
+    "target_timezone": {
+     "type": "string",
+     "description": "To"
+    }
+   },
+   "required": [
+    "time",
+    "source_timezone",
+    "target_timezone"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "sequentialthinking",
+  "kind": "public",
+  "description": "A tool for dynamic and reflective step-by-step problem solving through thoughts.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "thought": {
+     "type": "string",
+     "description": "Current thought"
+    },
+    "nextThoughtNeeded": {
+     "type": "boolean",
+     "description": "More thoughts needed"
+    }
+   },
+   "required": [
+    "thought",
+    "nextThoughtNeeded"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "notion_search",
+  "kind": "public",
+  "description": "Search pages and databases in a Notion workspace by title.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "query": {
+     "type": "string",
+     "description": "Query"
+    }
+   },
+   "required": [
+    "query"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "notion_create_page",
+  "kind": "public",
+  "description": "Create a new page in Notion under a parent page or database.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "parent_id": {
+     "type": "string",
+     "description": "Parent"
+    },
+    "title": {
+     "type": "string",
+     "description": "Title"
+    }
+   },
+   "required": [
+    "parent_id",
+    "title"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "notion_append_block_children",
+  "kind": "public",
+  "description": "Append content blocks to a Notion page.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "block_id": {
+     "type": "string",
+     "description": "Page or block"
+    },
+    "children": {
+     "type": "string",
+     "description": "Blocks JSON"
+    }
+   },
+   "required": [
+    "block_id",
+    "children"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "linear_create_issue",
+  "kind": "public",
+  "description": "Create a new issue in Linear.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "title": {
+     "type": "string",
+     "description": "Title"
+    },
+    "teamId": {
+     "type": "string",
+     "description": "Team"
+    }
+   },
+   "required": [
+    "title",
+    "teamId"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "linear_search_issues",
+  "kind": "public",
+  "description": "Search Linear issues with flexible filters.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "query": {
+     "type": "string",
+     "description": "Query"
+    }
+   },
+   "required": [
+    "query"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "get_sentry_issue",
+  "kind": "public",
+  "description": "Retrieve and analyze a Sentry issue by ID or URL.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "issue_id_or_url": {
+     "type": "string",
+     "description": "Issue"
+    }
+   },
+   "required": [
+    "issue_id_or_url"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "gdrive_search",
+  "kind": "public",
+  "description": "Search for files in Google Drive.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "query": {
+     "type": "string",
+     "description": "Query"
+    }
+   },
+   "required": [
+    "query"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "gsheets_read",
+  "kind": "public",
+  "description": "Read data from a Google Spreadsheet range.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "spreadsheetId": {
+     "type": "string",
+     "description": "Spreadsheet"
+    },
+    "range": {
+     "type": "string",
+     "description": "A1 range"
+    }
+   },
+   "required": [
+    "spreadsheetId"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "gmail_send_email",
+  "kind": "public",
+  "description": "Send an email via Gmail.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "to": {
+     "type": "string",
+     "description": "Recipient"
+    },
+    "subject": {
+     "type": "string",
+     "description": "Subject"
+    },
+    "body": {
+     "type": "string",
+     "description": "Body"
+    }
+   },
+   "required": [
+    "to",
+    "subject",
+    "body"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "gmail_search_emails",
+  "kind": "public",
+  "description": "Search emails in Gmail using query syntax.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "query": {
+     "type": "string",
+     "description": "Query"
+    }
+   },
+   "required": [
+    "query"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "everart_generate_image",
+  "kind": "public",
+  "description": "Generate images using EverArt models.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "prompt": {
+     "type": "string",
+     "description": "Prompt"
+    }
+   },
+   "required": [
+    "prompt"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "youtube_get_transcript",
+  "kind": "public",
+  "description": "Get the transcript of a YouTube video.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "url": {
+     "type": "string",
+     "description": "Video URL"
+    }
+   },
+   "required": [
+    "url"
+   ],
+   "additionalProperties": false
+  }
+ },
+ {
+  "name": "weather_get_forecast",
+  "kind": "public",
+  "description": "Get the weather forecast for a location.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "latitude": {
+     "type": "integer",
+     "description": "Latitude"
+    },
+    "longitude": {
+     "type": "integer",
+     "description": "Longitude"
+    }
+   },
+   "required": [
+    "latitude",
+    "longitude"
+   ],
+   "additionalProperties": false
+  }
+ }
+]

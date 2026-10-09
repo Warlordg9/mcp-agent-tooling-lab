@@ -1,0 +1,30 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.13, pytest-9.1.1, pluggy-1.6.0 -- /Users/danield/hw-mcp-tools/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/danield/hw-mcp-tools
+configfile: pyproject.toml
+testpaths: tests
+plugins: platformdirs-4.12.4, anyio-4.15.1
+collecting ... collected 19 items
+
+tests/test_server.py::test_http_discover_and_stateless PASSED            [  5%]
+tests/test_server.py::test_http_initialize_rejected PASSED               [ 10%]
+tests/test_server.py::test_legacy_client_rejected PASSED                 [ 15%]
+tests/test_server.py::test_schemas_published PASSED                      [ 21%]
+tests/test_server.py::test_unknown_argument_rejected_with_hint PASSED    [ 26%]
+tests/test_server.py::test_unknown_tool PASSED                           [ 31%]
+tests/test_server.py::test_search_success_and_pagination PASSED          [ 36%]
+tests/test_server.py::test_search_errors PASSED                          [ 42%]
+tests/test_server.py::test_search_empty_day_gives_hint PASSED            [ 47%]
+tests/test_server.py::test_concise_shorter_than_detailed PASSED          [ 52%]
+tests/test_server.py::test_get_slot PASSED                               [ 57%]
+tests/test_server.py::test_book_success_and_idempotency PASSED           [ 63%]
+tests/test_server.py::test_book_errors PASSED                            [ 68%]
+tests/test_server.py::test_book_overlap_rejected PASSED                  [ 73%]
+tests/test_server.py::test_get_booking PASSED                            [ 78%]
+tests/test_server.py::test_list_bookings PASSED                          [ 84%]
+tests/test_server.py::test_cancel PASSED                                 [ 89%]
+tests/test_server.py::test_state_survives_new_server_instance PASSED     [ 94%]
+tests/test_server.py::test_flaky_modes PASSED                            [100%]
+
+============================== 19 passed in 2.79s ==============================

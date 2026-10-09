@@ -1,0 +1,44 @@
+[
+ {
+  "tool": "consult_search_slots",
+  "example": "поиск: 5 слотов за 2026-10-15",
+  "concise": {
+   "cl100k": 331,
+   "qwen2.5": 391,
+   "chars": 627
+  },
+  "detailed": {
+   "cl100k": 1048,
+   "qwen2.5": 1067,
+   "chars": 2451
+  }
+ },
+ {
+  "tool": "consult_get_slot",
+  "example": "карточка одного слота",
+  "concise": {
+   "cl100k": 41,
+   "qwen2.5": 52,
+   "chars": 89
+  },
+  "detailed": {
+   "cl100k": 171,
+   "qwen2.5": 169,
+   "chars": 424
+  }
+ },
+ {
+  "tool": "consult_list_bookings",
+  "example": "брони студента (2 шт.)",
+  "concise": {
+   "cl100k": 80,
+   "qwen2.5": 106,
+   "chars": 168
+  },
+  "detailed": {
+   "cl100k": 523,
+   "qwen2.5": 534,
+   "chars": 1365
+  }
+ }
+]

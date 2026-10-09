@@ -1,0 +1,525 @@
+# MCP Inspector 2026-10-09T21:19:24Z, server: consult_mcp (MCP 2026-07-28, stateless HTTP)
+
+$ inspector --protocol-era modern --method tools/list --strict
+{
+  "tools": [
+    {
+      "name": "consult_search_slots",
+      "title": "Поиск слотов консультаций",
+      "description": "Ищет слоты консультаций преподавателей курса на один день с фильтрами по формату, теме и преподавателю. Используй, когда студент хочет найти свободное время консультации или выбрать слот перед записью. Не используй для записи (consult_book), для просмотра своих броней (consult_list_bookings) и для вопросов о расписании лекций, дедлайнах и оценках — этих данных здесь нет. Если на день ничего нет, ответ подскажет ближайшие дни со слотами.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "День консультации в формате YYYY-MM-DD, например 2026-10-14. Расписание есть на 2026-10-12 — 2026-10-23."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "online",
+              "offline"
+            ],
+            "description": "Формат встречи: online (видеосвязь) или offline (аудитория). Не указывай, если формат не важен."
+          },
+          "topic": {
+            "type": "string",
+            "enum": [
+              "homework",
+              "project",
+              "exam",
+              "lecture"
+            ],
+            "description": "Тема: homework — домашние задания, project — курсовой проект, exam — подготовка к экзамену, lecture — вопросы по лекциям."
+          },
+          "teacher": {
+            "type": "string",
+            "enum": [
+              "ivanova",
+              "petrov",
+              "sidorova",
+              "kuznetsov",
+              "smirnova"
+            ],
+            "description": "Преподаватель по фамилии латиницей: ivanova, petrov, sidorova, kuznetsov, smirnova."
+          },
+          "only_free": {
+            "type": "boolean",
+            "default": true,
+            "description": "true — только слоты со свободными местами (по умолчанию); false — все слоты дня."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "default": 5,
+            "description": "Сколько слотов вернуть за раз, 1–20 (по умолчанию 5)."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Handle следующей страницы (next_cursor из прошлого ответа с теми же фильтрами). Для первой страницы не передавай."
+          },
+          "response_format": {
+            "type": "string",
+            "enum": [
+              "concise",
+              "detailed"
+            ],
+            "default": "concise",
+            "description": "concise — короткие строки с идентификаторами (по умолчанию, экономит токены); detailed — JSON со всеми полями: аудитория или ссылка, темы, вместимость, правила."
+          }
+        },
+        "required": [
+          "date"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "consult_get_slot",
+      "title": "Карточка слота",
+      "description": "Возвращает карточку одного слота по slot_id: время, длительность, формат, аудиторию или ссылку, темы и свободные места. Используй, чтобы уточнить детали уже найденного слота перед записью. Не используй для поиска по дате или преподавателю (consult_search_slots) и для статуса брони (consult_get_booking).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "slot_id": {
+            "type": "string",
+            "pattern": "^s-\\d{4}-[a-z]{3}-\\d{4}$",
+            "description": "Идентификатор слота из результата consult_search_slots, например s-1014-iva-1000."
+          },
+          "response_format": {
+            "type": "string",
+            "enum": [
+              "concise",
+              "detailed"
+            ],
+            "default": "concise",
+            "description": "concise — короткие строки с идентификаторами (по умолчанию, экономит токены); detailed — JSON со всеми полями: аудитория или ссылка, темы, вместимость, правила."
+          }
+        },
+        "required": [
+          "slot_id"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "consult_book",
+      "title": "Записать студента на слот",
+      "description": "Записывает студента на выбранный слот и возвращает booking_id и статус active. Используй только после того, как студент явно выбрал слот и подтвердил запись. Не используй для поиска времени (consult_search_slots), переноса без отмены старой брони и записи другого студента. Повтор с тем же idempotency_key не создаёт дубль.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "slot_id": {
+            "type": "string",
+            "pattern": "^s-\\d{4}-[a-z]{3}-\\d{4}$",
+            "description": "Идентификатор слота из результата consult_search_slots, например s-1014-iva-1000."
+          },
+          "student_id": {
+            "type": "string",
+            "pattern": "^st-\\d{4}$",
+            "description": "Идентификатор студента, от чьего имени действует агент, например st-1001."
+          },
+          "topic": {
+            "type": "string",
+            "enum": [
+              "homework",
+              "project",
+              "exam",
+              "lecture"
+            ],
+            "description": "Тема консультации; должна входить в темы слота: homework, project, exam или lecture."
+          },
+          "idempotency_key": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 64,
+            "description": "Уникальная строка на одну попытку записи (8–64 символа). При повторе той же записи передай тот же ключ."
+          },
+          "response_format": {
+            "type": "string",
+            "enum": [
+              "concise",
+              "detailed"
+            ],
+            "default": "concise",
+            "description": "concise — короткие строки с идентификаторами (по умолчанию, экономит токены); detailed — JSON со всеми полями: аудитория или ссылка, темы, вместимость, правила."
+          }
+        },
+        "required": [
+          "slot_id",
+          "student_id",
+          "topic",
+          "idempotency_key"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "consult_get_booking",
+      "title": "Статус брони",
+      "description": "Возвращает бронь студента по booking_id: слот, тему и статус (active или cancelled). Используй, чтобы проверить результат consult_book или consult_cancel. Не используй для поиска свободных слотов и для списка всех броней (consult_list_bookings).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "booking_id": {
+            "type": "string",
+            "pattern": "^b-[0-9a-f]{8}$",
+            "description": "Handle брони, который вернул consult_book или consult_list_bookings, например b-1a2b3c4d."
+          },
+          "student_id": {
+            "type": "string",
+            "pattern": "^st-\\d{4}$",
+            "description": "Идентификатор студента, от чьего имени действует агент, например st-1001."
+          },
+          "response_format": {
+            "type": "string",
+            "enum": [
+              "concise",
+              "detailed"
+            ],
+            "default": "concise",
+            "description": "concise — короткие строки с идентификаторами (по умолчанию, экономит токены); detailed — JSON со всеми полями: аудитория или ссылка, темы, вместимость, правила."
+          }
+        },
+        "required": [
+          "booking_id",
+          "student_id"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "consult_list_bookings",
+      "title": "Брони студента",
+      "description": "Показывает брони консультаций одного студента с фильтром по статусу. Используй, когда студент спрашивает, на какие консультации он записан, или нужно найти booking_id для отмены. Не используй для поиска свободного времени (consult_search_slots) и для броней других студентов.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "student_id": {
+            "type": "string",
+            "pattern": "^st-\\d{4}$",
+            "description": "Идентификатор студента, от чьего имени действует агент, например st-1001."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "cancelled",
+              "all"
+            ],
+            "default": "active",
+            "description": "active — действующие брони (по умолчанию), cancelled — отменённые, all — все."
+          },
+          "response_format": {
+            "type": "string",
+            "enum": [
+              "concise",
+              "detailed"
+            ],
+            "default": "concise",
+            "description": "concise — короткие строки с идентификаторами (по умолчанию, экономит токены); detailed — JSON со всеми полями: аудитория или ссылка, темы, вместимость, правила."
+          }
+        },
+        "required": [
+          "student_id"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "consult_cancel",
+      "title": "Отменить бронь",
+      "description": "Отменяет бронь студента по booking_id и освобождает место. Используй только по явной просьбе студента отменить свою запись. Не используй для чужих броней, для проверки статуса (consult_get_booking) и как первый шаг переноса без согласия студента.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "booking_id": {
+            "type": "string",
+            "pattern": "^b-[0-9a-f]{8}$",
+            "description": "Handle брони, который вернул consult_book или consult_list_bookings, например b-1a2b3c4d."
+          },
+          "student_id": {
+            "type": "string",
+            "pattern": "^st-\\d{4}$",
+            "description": "Идентификатор студента, от чьего имени действует агент, например st-1001."
+          },
+          "response_format": {
+            "type": "string",
+            "enum": [
+              "concise",
+              "detailed"
+            ],
+            "default": "concise",
+            "description": "concise — короткие строки с идентификаторами (по умолчанию, экономит токены); detailed — JSON со всеми полями: аудитория или ссылка, темы, вместимость, правила."
+          }
+        },
+        "required": [
+          "booking_id",
+          "student_id"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false
+      }
+    }
+  ]
+}
+[exit code: 0]
+
+$ inspector --protocol-era modern --method tools/call --tool-name consult_search_slots --tool-arg date=2026-10-14 topic=homework
+{
+  "_meta": {
+    "io.modelcontextprotocol/serverInfo": {
+      "name": "consult-booking",
+      "title": "Запись на консультации курса",
+      "version": "1.0.0"
+    }
+  },
+  "content": [
+    {
+      "type": "text",
+      "text": "2026-10-14: найдено 3, показаны 1–3\ns-1014-iva-1000 | 2026-10-14 10:00–10:30 | online | ivanova | homework,lecture | мест 1/2\ns-1014-iva-1030 | 2026-10-14 10:30–11:00 | online | ivanova | homework,lecture | мест 2/2\ns-1014-kuz-1200 | 2026-10-14 12:00–12:45 | offline | kuznetsov | project,homework | мест 1/2"
+    }
+  ],
+  "isError": false
+}
+[exit code: 0]
+
+$ inspector --protocol-era modern --method tools/call --tool-name consult_search_slots --tool-arg date=14.10.2026 format=zoom
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Ошибка: 'date' = '14.10.2026' в неверном формате. Как исправить: День консультации в формате YYYY-MM-DD, например 2026-10-14. Расписание есть на 2026-10-12 — 2026-10-23. 'format' = 'zoom' недопустимо. Как исправить: выберите одно из значений online, offline."
+    }
+  ],
+  "isError": true
+}
+{"error":{"code":"tool_is_error","message":"Tool 'consult_search_slots' returned isError:true."}}
+[exit code: 5]
+
+$ inspector --protocol-era modern --method tools/call --tool-name consult_get_slot --tool-arg slot_id=s-1014-iva-1030 response_format=detailed
+{
+  "_meta": {
+    "io.modelcontextprotocol/serverInfo": {
+      "name": "consult-booking",
+      "title": "Запись на консультации курса",
+      "version": "1.0.0"
+    }
+  },
+  "content": [
+    {
+      "type": "text",
+      "text": "{\n \"slot_id\": \"s-1014-iva-1030\",\n \"date\": \"2026-10-14\",\n \"start\": \"10:30\",\n \"end\": \"11:00\",\n \"duration_min\": 30,\n \"format\": \"online\",\n \"location\": \"https://meet.example.edu/ivanova\",\n \"teacher_id\": \"ivanova\",\n \"teacher_name\": \"Иванова Анна Сергеевна\",\n \"topics\": [\n  \"homework\",\n  \"lecture\"\n ],\n \"capacity\": 2,\n \"booked\": 0,\n \"free\": 2,\n \"rules\": \"Возьмите с собой вопросы заранее; опоздание более 5 минут — слот сгорает.\"\n}"
+    }
+  ],
+  "isError": false
+}
+[exit code: 0]
+
+$ inspector --protocol-era modern --method tools/call --tool-name consult_get_slot --tool-arg slot_id=s-0101-xyz-0900
+{
+  "_meta": {
+    "io.modelcontextprotocol/serverInfo": {
+      "name": "consult-booking",
+      "title": "Запись на консультации курса",
+      "version": "1.0.0"
+    }
+  },
+  "content": [
+    {
+      "type": "text",
+      "text": "Ошибка: Слот 's-0101-xyz-0900' не найден. Как исправить: возьмите slot_id из результата consult_search_slots (формат s-MMDD-xxx-HHMM, например s-1014-iva-1000)."
+    }
+  ],
+  "isError": true
+}
+{"error":{"code":"tool_is_error","message":"Tool 'consult_get_slot' returned isError:true."}}
+[exit code: 5]
+
+$ inspector --protocol-era modern --method tools/call --tool-name consult_book --tool-args-json {"slot_id":"s-1014-iva-1030","student_id":"st-1001","topic":"homework","idempotency_key":"inspector-0001"}
+{
+  "_meta": {
+    "io.modelcontextprotocol/serverInfo": {
+      "name": "consult-booking",
+      "title": "Запись на консультации курса",
+      "version": "1.0.0"
+    }
+  },
+  "content": [
+    {
+      "type": "text",
+      "text": "Записано: b-5247a4ad | s-1014-iva-1030 | 2026-10-14 10:30–11:00 | ivanova | homework | active"
+    }
+  ],
+  "isError": false
+}
+[exit code: 0]
+
+$ inspector --protocol-era modern --method tools/call --tool-name consult_book --tool-args-json {"slot_id":"s-1014-iva-1030","student_id":"st-1001","topic":"project","idempotency_key":"inspector-0002"}
+{
+  "_meta": {
+    "io.modelcontextprotocol/serverInfo": {
+      "name": "consult-booking",
+      "title": "Запись на консультации курса",
+      "version": "1.0.0"
+    }
+  },
+  "content": [
+    {
+      "type": "text",
+      "text": "Ошибка: Тема 'project' не принимается в слоте s-1014-iva-1030. Как исправить: выберите одну из тем слота: homework, lecture, или найдите слот с этой темой через consult_search_slots(topic='project')."
+    }
+  ],
+  "isError": true
+}
+{"error":{"code":"tool_is_error","message":"Tool 'consult_book' returned isError:true."}}
+[exit code: 5]
+
+$ inspector --protocol-era modern --method tools/call --tool-name consult_list_bookings --tool-arg student_id=st-1001
+{
+  "_meta": {
+    "io.modelcontextprotocol/serverInfo": {
+      "name": "consult-booking",
+      "title": "Запись на консультации курса",
+      "version": "1.0.0"
+    }
+  },
+  "content": [
+    {
+      "type": "text",
+      "text": "b-5247a4ad | s-1014-iva-1030 | 2026-10-14 10:30–11:00 | ivanova | homework | active"
+    }
+  ],
+  "isError": false
+}
+[exit code: 0]
+
+$ inspector --protocol-era modern --method tools/call --tool-name consult_list_bookings --tool-arg student_id=1001
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Ошибка: 'student_id' должен иметь тип string, получено 1001. Как исправить: Идентификатор студента, от чьего имени действует агент, например st-1001."
+    }
+  ],
+  "isError": true
+}
+{"error":{"code":"tool_is_error","message":"Tool 'consult_list_bookings' returned isError:true."}}
+[exit code: 5]
+
+$ inspector --protocol-era modern --method tools/call --tool-name consult_get_booking --tool-arg booking_id=b-5247a4ad student_id=st-1001
+{
+  "_meta": {
+    "io.modelcontextprotocol/serverInfo": {
+      "name": "consult-booking",
+      "title": "Запись на консультации курса",
+      "version": "1.0.0"
+    }
+  },
+  "content": [
+    {
+      "type": "text",
+      "text": "b-5247a4ad | s-1014-iva-1030 | 2026-10-14 10:30–11:00 | ivanova | homework | active"
+    }
+  ],
+  "isError": false
+}
+[exit code: 0]
+
+$ inspector --protocol-era modern --method tools/call --tool-name consult_get_booking --tool-arg booking_id=b-5247a4ad student_id=st-2002
+{
+  "_meta": {
+    "io.modelcontextprotocol/serverInfo": {
+      "name": "consult-booking",
+      "title": "Запись на консультации курса",
+      "version": "1.0.0"
+    }
+  },
+  "content": [
+    {
+      "type": "text",
+      "text": "Ошибка: Бронь 'b-5247a4ad' принадлежит другому студенту. Как исправить: работать можно только со своими бронями: передайте student_id владельца или найдите свои брони через consult_list_bookings."
+    }
+  ],
+  "isError": true
+}
+{"error":{"code":"tool_is_error","message":"Tool 'consult_get_booking' returned isError:true."}}
+[exit code: 5]
+
+$ inspector --protocol-era modern --method tools/call --tool-name consult_cancel --tool-arg booking_id=b-5247a4ad student_id=st-1001
+{
+  "_meta": {
+    "io.modelcontextprotocol/serverInfo": {
+      "name": "consult-booking",
+      "title": "Запись на консультации курса",
+      "version": "1.0.0"
+    }
+  },
+  "content": [
+    {
+      "type": "text",
+      "text": "Отменено: b-5247a4ad | s-1014-iva-1030 | 2026-10-14 10:30–11:00 | ivanova | homework | cancelled; место освобождено (свободно 2/2)"
+    }
+  ],
+  "isError": false
+}
+[exit code: 0]
+
+$ inspector --protocol-era modern --method tools/call --tool-name consult_cancel --tool-arg booking_id=b-5247a4ad student_id=st-1001
+{
+  "_meta": {
+    "io.modelcontextprotocol/serverInfo": {
+      "name": "consult-booking",
+      "title": "Запись на консультации курса",
+      "version": "1.0.0"
+    }
+  },
+  "content": [
+    {
+      "type": "text",
+      "text": "Ошибка: Бронь b-5247a4ad уже отменена. Как исправить: повторная отмена не нужна; актуальные брони покажет consult_list_bookings."
+    }
+  ],
+  "isError": true
+}
+{"error":{"code":"tool_is_error","message":"Tool 'consult_cancel' returned isError:true."}}
+[exit code: 5]
+
+$ inspector --protocol-era legacy --method tools/list
+{"error":{"code":"error","message":"Сервер работает только по MCP 2026-07-28: вызовите server/discover и передавайте _meta в каждом запросе."}}
+[exit code: 1]
+

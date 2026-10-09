@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "consult-mcp"
+version = "0.1.0"
+description = "Stateless MCP 2026-07-28 server for course consultation booking, plus an evaluation of tool selection at scale and agent loop guards"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12"
+authors = [{ name = "Warlordg9" }]
+keywords = ["mcp", "model-context-protocol", "llm-agents", "tool-use", "evaluation"]
+dependencies = [
+    "mcp==2.3.0",
+    "jsonschema>=4.26",
+]
+
+[project.optional-dependencies]
+experiment = ["numpy>=2", "pandas>=3", "matplotlib>=3.9", "tiktoken>=0.14", "nbformat>=5.10", "nbconvert>=7.16", "ipykernel>=6"]
+dev = ["pytest>=8", "anyio>=4", "httpx>=0.28", "ruff>=0.6"]
+
+[project.scripts]
+consult-mcp = "consult_mcp.server:main"
+
+[project.urls]
+Homepage = "https://github.com/Warlordg9/mcp-agent-tooling-lab"
+
+[tool.setuptools.packages.find]
+include = ["consult_mcp*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 160
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E731"]
+
+[tool.ruff.lint.per-file-ignores]
+"consult_mcp/schemas.py" = ["E501"]  # длинные описания инструментов для LLM
+"consult_mcp/store.py" = ["E501"]    # тексты ошибок с подсказками
